@@ -136,3 +136,8 @@ val addTwoAlgebra: InitialAlgebra[IntListF] =
 ```
 
 ## Evaluation for Free: Eval
+
+TODO: Introduce catamorphism... possibly via
+
+1. Initial algebra Homomorphism proof
+2. Or a diagram
