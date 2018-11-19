@@ -1,8 +1,8 @@
 package using.fix
 
 object fix {
-  import cats.Foldable
-  import cats.syntax.foldable._
+  import cats.Functor
+  import cats.syntax.functor._
 
   final case class Fix[F[_]](unFix: F[Fix[F]]) extends AnyVal
 
@@ -15,10 +15,16 @@ object fix {
     phi andThen unFix andThen psi
 
   def andThenAll[F[_]]: List[InitialAlgebra[F]] => InitialAlgebra[F] = {
-    val onEmpty = sys.error("andThenAll: empty Foldable")
+    lazy val onEmpty = sys.error("andThenAll: empty List")
 
     _ reduceLeftOption andThen getOrElse(onEmpty)
   }
+
+  def cata[F[_]: Functor, A](
+    algebra: Algebra[F, A]
+  )(
+    fix: Fix[F]
+  ): A = algebra(fix.unFix map cata(algebra))
 }
 
 object intList {
@@ -75,11 +81,13 @@ object list {
 }
 
 object expr {
-  import cats.implicits._
-  import fix._
+  import ExprF._
   import Literal._
   import OpType._
-  import ExprF._
+  import cats.Functor
+  import cats.implicits._
+  import cats.syntax.functor._
+  import fix._
 
   type Name = String
 
@@ -105,6 +113,28 @@ object expr {
     final case class Op[A](op: OpType, opl: A, opr: A) extends ExprF[A]
     final case class Const[A](lit: Literal) extends ExprF[A]
     final case class Var[A](name: Name) extends ExprF[A]
+
+    implicit val functor: Functor[ExprF] = new Functor[ExprF] {
+      def map[A, B](fa: ExprF[A])(f: A => B): ExprF[B] = fa match {
+        case const: Const[A] => const copy ()
+        case variable: Var[A] => variable copy ()
+        case Op(opType, opl, opr) => Op(opType, f(opl), f(opr))
+      }
+    }
+
+    object ConstInt {
+      final def unapply(c: Expr): Option[Int] = c match {
+        case Fix(Const(IntLit(i))) => Some(i)
+        case _ => None
+      }
+    }
+
+    object ConstBool {
+      final def unapply(c: Expr): Option[Boolean] = c match {
+        case Fix(Const(BoolLit(b))) => Some(b)
+        case _ => None
+      }
+    }
   }
 
   type Expr = Fix[ExprF]
@@ -118,21 +148,22 @@ object expr {
   /** An [[InitialAlgebra]] optimizing (Int, ==).
     */
   val optimizeIntEqA: InitialAlgebra[ExprF] = {
-    case Op(Eq, Fix(Const(IntLit(i1))), Fix(Const(IntLit(i2)))) => bool(i1 == i2)
+    case Op(Eq, ConstInt(i1), ConstInt(i2)) => bool(i1 == i2)
     case e: ExprF[Expr] => Fix(e)
   }
 
   /** An [[InitialAlgebra]] optimizing (Int, +).
     */
   val optimizeIntAddA: InitialAlgebra[ExprF] = {
-    case Op(Eq, Fix(Const(IntLit(i1))), Fix(Const(IntLit(i2)))) => int(i1 + i2)
+    case Op(Add, ConstInt(i1), ConstInt(i2)) =>
+      int(i1 + i2)
     case e: ExprF[Expr] => Fix(e)
   }
 
   /** An [[InitialAlgebra]] optimizing (Boolean, ==).
     */
   val optimizeBoolEqA: InitialAlgebra[ExprF] = {
-    case Op(Eq, Fix(Const(BoolLit(b1))), Fix(Const(BoolLit(b2)))) => bool(b1 == b2)
+    case Op(Eq, ConstBool(b1), ConstBool(b2)) => bool(b1 == b2)
     case e: ExprF[Expr] => Fix(e)
   }
 
@@ -140,7 +171,7 @@ object expr {
     *
     * Expressed as a composition of [[InitialAlgebra]]s.
     */
-  val optimize: InitialAlgebra[ExprF] = andThenAll(
+  val optimizeA: InitialAlgebra[ExprF] = andThenAll(
     List(optimizeIntEqA, optimizeIntAddA, optimizeBoolEqA)
   )
 
@@ -149,17 +180,23 @@ object expr {
     * Substitutes [[Expr]] [[Var]] clauses with [[Expr]] from an [[Env]]
     * environment. Expressed in terms of [[InitialAlgebra]].
     */
-  def subst: Env => InitialAlgebra[ExprF] = env => {
+  val substA: Env => InitialAlgebra[ExprF] = env => {
     case v@Var(name)    => env get name getOrElse Fix(v)
     case e: ExprF[Expr] => Fix(e)
   }
 
-  def eval: Env => Expr => Boolean = env => {
-    val eval1: InitialAlgebra[ExprF] = andThen(subst(env), optimize)
+  val evalA: Env => InitialAlgebra[ExprF] = env => andThen(substA(env), optimizeA)
 
-    ??? //TODO
+  val eval: Env => Expr => Expr = env => cata(evalA(env))
+
+  object example {
+    val expr: Expr = equal(add(variable("var"))(int(1)))(int(2))
+    val env: Env = Map("var" -> int(1))
+
+    val run = eval(env)(expr)
   }
 }
 
 object Main extends App {
+  println(expr.example.run)
 }
