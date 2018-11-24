@@ -145,6 +145,15 @@ object expr {
   val equal: Expr => Expr => Expr = lop => rop => Fix(Op(Eq, lop, rop))
   val add: Expr => Expr => Expr = lop => rop => Fix(Op(Add, lop, rop))
 
+  /** A printing [[Algebra]]
+    */
+   val printAlgebra: Algebra[ExprF, String] = {
+    case Op(Eq, lop, rop)  => s"($lop == $rop)"
+    case Op(Add, lop, rop) => s"($lop + $rop)"
+    case Const(lit)        => s"$lit"
+    case Var(variable)     => s"var($variable)"
+   }
+
   /** An [[InitialAlgebra]] optimizing (Int, ==).
     */
   val optimizeIntEqA: InitialAlgebra[ExprF] = {
