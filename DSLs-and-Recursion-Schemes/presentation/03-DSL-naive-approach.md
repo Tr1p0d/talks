@@ -9,30 +9,15 @@ sealed trait Expr
 
 object Expr {
   final case class Op(op: OpType, opl: Expr, opr: Expr)
-    extends Expr
+                                       extends Expr
   final case class Const(lit: Literal) extends Expr
-  final case class Var(name: String) extends Expr
+  final case class Var(name: String)   extends Expr
 }
 ```
 
 ## DSL
 
-```scala
-sealed trait OpType
-
-object OpType {
-  final case object Add extends OpType
-  final case object Eq  extends OpType
-}
-```
-```scala
-sealed trait Literal
-
-object Literal {
-  final case class IntLit(int: Int) extends Literal
-  final case class BoolLit(bool: Boolean) extends Literal
-}
-```
+![](./img/recursive-tree.png)
 
 ## DSL: Optimizer
 
@@ -52,7 +37,7 @@ val optimize: Expr => Expr = {
 
 ## DSL: Variable Substitution
 
-Before *DSL* expression evaluation *variables* should be substituted
+### Variables: the mistery tour
 
 ```scala
 type Env = Map[String, Expr]
@@ -72,6 +57,8 @@ def subst: Env => Expr => Expr = env => {
 def eval: Env => Expr => Expr =
   subst(_) andThen optimize
 ```
+
+![](./img/recursive-eval.png)
 
 ## Limits of this model
 

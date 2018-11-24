@@ -6,57 +6,49 @@
 
 ```scala
 def fix[A]: (A => A) => A = f => f(fix(f))
-
+```
+### or a data type
+```scala
 case class Fix[F[_]](unFix: F[Fix[F]]) extends AnyVal
 ```
 
-| An $x \in X$ of a function $f: X \Rightarrow X$ is a
-| fixed point if $f(x) = x$.
-
 ## Abstract Over Recursion
 
-### Recursive grammar
+### Reveal the true primitives
 
 ```scala
-sealed trait IntList
+sealed trait ExprF[A]
 
-case class IntCons(i: Int, is: IntList) extends IntList
-case object IntNil                      extends IntList
-```
-```scala
-val intList = IntCons(3, IntCons(2, IntCons(1, IntNil)))
-```
-
-## Abstract Over Recursion
-
-### Recursion can be abstracted away revealing the true primitives
-
-1. Find a non-recursive grammar *precursor*
-2. Find its fixpoint
-
-## Abstract Over Recursion
-
-### Non-recursive *precursor*
-
-```scala
-sealed trait IntListF[A]
-
-object IntListF {
-  case class IntConsF[A](i: Int, is: A) extends IntListF[A]
-  case class IntNilF[A]()               extends IntListF[A]
+object ExprF {
+  case class Op[A](op: OpType, opl: A, opr: A)
+    extends ExprF[A]
+  case class Const[A](lit: Literal) extends ExprF[A]
+  case class Var[A](name: Name) extends ExprF[A]
 }
 
-type IntList = Fix[IntListF]
-
-val intList1 = Fix(IntConsF(3, Fix(IntConsF(2, ... ))))
+type Expr = Fix[ExprF]
 ```
+
+## Abstract Over Recursion
+
+### Fix In Action
+
+![](./img/fix-tree.png)
 
 ## Evaluation for Free
 
-### A recipe for extracting a single value from an expression
+### extract a single value from an expression
+
+Unpack Traverse Apply
 
 ```scala
-val sum: IntList => Int = ???
+def cata[F[_]: Functor, A](
+  algebra: F[A] => A
+)(
+  fix: Fix[F]
+): A = algebra(fix.unFix map cata(algebra))
+
+val some: Expr => A = cata(someAlgebra)(_)
 ```
 
 ## Evaluation for Free: Algebra
@@ -67,25 +59,20 @@ type Algebra: F[A] => A
 
 *Algebra* (*F-Algebra*) consists of:
 
-1. **F** is a **Functor**
-2. **A** is its carrier type
-3. Morphism **F[A]** to **A**
+1. An **(Endo-)Functor** **F**
+2. Its carrier type **A**
+3. A Morphism **F[A]** to **A**
 
 ## Evaluation for Free: Algebra
 
 ### There can be many algebras
 
 ```scala
-def sumAlgebra: Algebra[IntListF, Int] = {
-  case IntConsF(i, is) => i + is
-  case IntNilF()       => 0
-}
-```
-
-```scala
-def printAlgebra: Algebra[IntListF, String] = {
-  case IntConsF(i, is) => s"[$i $is]"
-  case IntNilF()       => ""
+val printAlgebra: Algebra[ExprF, String] = {
+  case Op(Eq, lop, rop)  => s"($lop == $rop)"
+  case Op(Add, lop, rop) => s"($lop + $rop)"
+  case Const(lit)        => s"$lit"
+  case Var(variable)     => s"var($variable)"
 }
 ```
 
@@ -100,38 +87,19 @@ type InitialAlgebra[F[_]] = Algebra[F, Fix[F]]
 It is at least as powerful as all other *Algebra*s
 
 ```scala
-val addOneAlgebra: InitialAlgebra[IntListF] = {
-  case IntConsF(i, is) => Fix(IntConsF(i + 1, is))
-  case IntNilF()       => Fix(IntNilF())
+val optimizeIntEqA: InitialAlgebra[ExprF] = {
+  case Op(Eq, ConstInt(i1), ConstInt(i2)) => bool(i1 == i2)
+  case e: ExprF[Expr] => Fix(e)
 }
 ```
 
 ## Evaluation for Free: Initial Algebra
 
-### The property to die for: Composition
+### The property to die for
 
 ```scala
 def compose[F[_], A](
     phi: InitialAlgebra[F],
     psi: InitialAlgebra[F]
 ): InitialAlgebra[F] = phi compose unFix compose psi
-```
-
-```scala
-val addTwoAlgebra: InitialAlgebra[IntListF] =
-  compose(addOneAlgebra, addOneAlgebra)
-```
-
-## Evaluation for Free: Evaluate
-
-### Unpack Traverse Apply
-
-```scala
-def cata[F[_]: Functor, A](
-  algebra: Algebra[F, A]
-)(
-  fix: Fix[F]
-): A = algebra(fix.unFix map cata(algebra))
-
-val addTwo = cata(addTwoAlgebra)(expr)
 ```

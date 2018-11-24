@@ -1,22 +1,5 @@
 # DSL for Help: Revisited
 
-## DSL - Revisited
-
-### In search for a Fixpoint
-
-```scala
-sealed trait ExprF[A]
-
-object ExprF {
-  case class Op[A](op: OpType, opl: A, opr: A)
-    extends ExprF[A]
-  case class Const[A](lit: Literal) extends ExprF[A]
-  case class Var[A](name: Name) extends ExprF[A]
-}
-
-type Expr = Fix[ExprF]
-```
-
 ## DSL - Revisited: Optimizer
 
 ### Composition for the win
@@ -58,6 +41,10 @@ val evalA: Env => InitialAlgebra[ExprF] =
 ```scala
 val eval: Env => Expr => Expr = env => _ cata evalA(env)
 ```
+
+## DSL - Revisited: Evaluation
+
+![](./img/eval-cata.png)
 
 ## How About Typechecker
 

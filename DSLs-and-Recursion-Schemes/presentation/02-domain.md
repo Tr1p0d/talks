@@ -30,13 +30,7 @@
 
 ### A distinctive attribute or aspect of something
 
-Date of birth
-
-Category B driving license
-
-FIT VUT student
-
-Well built figure
+![](./img/birth-certificate.png)
 
 ## Feature Predicate
 
@@ -44,6 +38,4 @@ Well built figure
 
 Are you an adult?
 
-```
-$featureVal + years(18) >= $now
-```
+![](./img/feature-predicate.png)
