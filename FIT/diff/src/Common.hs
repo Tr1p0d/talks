@@ -23,9 +23,18 @@ data Bar = Bar Double String
 bar1 = Bar 1.0 "abcd"
 bar2 = Bar 2.0 "bcda"
 
+-- | Data type representing all possible outcomes of a diff.
+-- It is what 'Generic' does for product types but without
+-- such strong type safety.
 data Result
     = DiffDouble Double
     | DiffString Bool
+    -- ^ It is not flexible since we have to defined what the outcome
+    -- of diffing a constant is. What if we wanted to diff String
+    -- with different outcome than 'Bool'?
     | Tuple Result Result
+    -- ^ Create a pair of two results. Very similar to ':*:'.
     | Empty
+    -- ^ Neutral element with respect to product types. Equivalent
+    -- to 'U1'.
   deriving Show
